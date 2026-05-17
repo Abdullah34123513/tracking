@@ -1,163 +1,186 @@
 #!/bin/bash
 # ============================================================
-# Tracker Backend - Hostinger VPS Deployment Script
-# Run this script via SSH on your Hostinger VPS
+# Tracker Backend - Hostinger Shared Hosting Deploy Script
+# Safe to run multiple times. Handles fresh install & updates.
 # Usage: bash deploy.sh
 # ============================================================
 
 set -e
 
-echo "============================================"
-echo "  Tracker Backend Deployment"
-echo "============================================"
-
-# --- Configuration ---
 REPO_URL="https://github.com/Abdullah34123513/tracking.git"
-APP_DIR="/var/www/tracker"
-DOMAIN="_"  # Change this to your domain if you have one
+DOMAIN_DIR="$HOME/domains/api.abdullahsourcing.com"
+APP_DIR="$DOMAIN_DIR"
+DB_FILE="$APP_DIR/database/database.sqlite"
 
-# --- Detect PHP version ---
-PHP_VERSION=""
-for v in 8.3 8.2 8.1; do
-    if command -v "php${v}" &> /dev/null || dpkg -l "php${v}" &> /dev/null 2>&1; then
-        PHP_VERSION="$v"
-        break
-    fi
-done
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-echo ""
-echo "[1/8] Installing required packages..."
-sudo apt update -y
-sudo apt install -y nginx mysql-server git curl unzip software-properties-common
-
-# Install PHP if not found
-if [ -z "$PHP_VERSION" ]; then
-    echo "Installing PHP 8.3..."
-    sudo add-apt-repository -y ppa:ondrej/php
-    sudo apt update -y
-    PHP_VERSION="8.3"
-fi
-
-sudo apt install -y php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-mysql \
-    php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml php${PHP_VERSION}-curl \
-    php${PHP_VERSION}-zip php${PHP_VERSION}-gd php${PHP_VERSION}-bcmath \
-    php${PHP_VERSION}-tokenizer php${PHP_VERSION}-sqlite3
-
-echo "Using PHP version: ${PHP_VERSION}"
+log()  { echo -e "${GREEN}[✓]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 echo ""
-echo "[2/8] Installing Composer..."
-if ! command -v composer &> /dev/null; then
-    curl -sS https://getcomposer.org/installer | php
-    sudo mv composer.phar /usr/local/bin/composer
-fi
-
+echo "============================================"
+echo "  Tracker Backend Deploy (Hostinger)"
+echo "============================================"
 echo ""
-echo "[3/8] Cloning repository..."
-if [ -d "$APP_DIR" ]; then
-    echo "Directory exists, pulling latest..."
+
+# --- Check domain dir exists ---
+[ -d "$DOMAIN_DIR" ] || err "Domain directory not found: $DOMAIN_DIR"
+
+cd "$DOMAIN_DIR"
+
+# --- Step 1: Clone or Pull ---
+if [ -f "$APP_DIR/artisan" ]; then
+    # Already deployed — pull latest
+    log "Existing install found. Pulling latest from GitHub..."
+    
+    # Save .env and firebase key before pull
+    [ -f .env ] && cp .env /tmp/.env.tracker.bak
+    [ -f storage/app/firebase-service-account.json ] && cp storage/app/firebase-service-account.json /tmp/firebase.bak
+    
+    # Pull latest backend files
+    cd /tmp
+    rm -rf tracker_update
+    git clone --depth 1 "$REPO_URL" tracker_update 2>/dev/null
+    
+    # Sync backend files (skip .env and database)
+    rsync -a --exclude='.env' --exclude='database/database.sqlite' --exclude='storage/app/firebase-service-account.json' --exclude='storage/logs' --exclude='storage/framework/sessions' /tmp/tracker_update/backend/ "$APP_DIR/"
+    rm -rf /tmp/tracker_update
+    
     cd "$APP_DIR"
-    git pull origin main
+    
+    # Restore .env and firebase key
+    [ -f /tmp/.env.tracker.bak ] && mv /tmp/.env.tracker.bak .env
+    [ -f /tmp/firebase.bak ] && mkdir -p storage/app && mv /tmp/firebase.bak storage/app/firebase-service-account.json
+    
+    log "Code updated from GitHub."
 else
-    sudo git clone "$REPO_URL" "$APP_DIR"
+    # Fresh install
+    log "Fresh install. Cloning repository..."
+    cd /tmp
+    rm -rf tracker_clone
+    git clone --depth 1 "$REPO_URL" tracker_clone 2>/dev/null || err "Failed to clone repo. Push to GitHub first!"
+    
+    # Copy backend files to domain dir
+    cp -r tracker_clone/backend/* "$APP_DIR/"
+    cp tracker_clone/backend/.env.example "$APP_DIR/.env" 2>/dev/null || true
+    cp tracker_clone/backend/.gitignore "$APP_DIR/" 2>/dev/null || true
+    rm -rf /tmp/tracker_clone
+    
     cd "$APP_DIR"
+    log "Repository cloned successfully."
 fi
 
-cd "$APP_DIR/backend"
+# --- Step 2: public_html symlink ---
+if [ -L "$DOMAIN_DIR/public_html" ]; then
+    log "public_html symlink already exists."
+elif [ -d "$DOMAIN_DIR/public_html" ]; then
+    # Backup and replace
+    warn "Replacing public_html directory with symlink..."
+    rm -rf "$DOMAIN_DIR/public_html"
+    ln -s "$DOMAIN_DIR/public" "$DOMAIN_DIR/public_html"
+    log "public_html → public symlink created."
+else
+    ln -s "$DOMAIN_DIR/public" "$DOMAIN_DIR/public_html"
+    log "public_html → public symlink created."
+fi
 
-echo ""
-echo "[4/8] Installing Laravel dependencies..."
-sudo composer install --optimize-autoloader --no-dev --no-interaction
+# --- Step 3: Composer install ---
+log "Installing dependencies..."
+if command -v composer &> /dev/null; then
+    composer install --optimize-autoloader --no-dev --no-interaction --quiet 2>/dev/null
+    log "Composer dependencies installed."
+else
+    # Try php composer.phar
+    if [ -f composer.phar ]; then
+        php composer.phar install --optimize-autoloader --no-dev --no-interaction --quiet
+    else
+        warn "Downloading Composer..."
+        curl -sS https://getcomposer.org/installer | php -- --quiet
+        php composer.phar install --optimize-autoloader --no-dev --no-interaction --quiet
+    fi
+    log "Composer dependencies installed."
+fi
 
-echo ""
-echo "[5/8] Setting up environment..."
+# --- Step 4: Environment setup ---
 if [ ! -f .env ]; then
     cp .env.example .env
-    php artisan key:generate
+    log "Created .env from example."
 fi
 
-# Setup SQLite database (simple, no MySQL config needed)
-touch database/database.sqlite
+# Generate key if not set
+if grep -q "APP_KEY=$" .env || grep -q "APP_KEY=base64:$" .env 2>/dev/null; then
+    php artisan key:generate --force --quiet
+    log "App key generated."
+else
+    log "App key already set."
+fi
 
-# Update .env for production with SQLite
-sudo sed -i 's/APP_ENV=local/APP_ENV=production/' .env
-sudo sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
-sudo sed -i 's|APP_URL=http://localhost|APP_URL=http://'"$(curl -s ifconfig.me)"'|' .env
+# Set production values
+sed -i 's/APP_ENV=local/APP_ENV=production/' .env
+sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
+sed -i 's|APP_URL=http://localhost|APP_URL=https://api.abdullahsourcing.com|' .env
 
-echo ""
-echo "[6/8] Running migrations and seeding..."
-php artisan migrate --force --seed
-php artisan optimize
-php artisan storage:link 2>/dev/null || true
+# --- Step 5: Database ---
+mkdir -p database
+if [ ! -f "$DB_FILE" ]; then
+    touch "$DB_FILE"
+    log "SQLite database created."
+else
+    log "SQLite database already exists."
+fi
 
-echo ""
-echo "[7/8] Setting permissions..."
-sudo chown -R www-data:www-data "$APP_DIR"
-sudo chmod -R 775 "$APP_DIR/backend/storage"
-sudo chmod -R 775 "$APP_DIR/backend/bootstrap/cache"
+# Run migrations
+php artisan migrate --force --quiet 2>/dev/null
+log "Migrations complete."
 
-echo ""
-echo "[8/8] Configuring Nginx..."
-sudo tee /etc/nginx/sites-available/tracker > /dev/null <<NGINX
-server {
-    listen 80;
-    server_name ${DOMAIN};
-    root ${APP_DIR}/backend/public;
+# Seed only if admin doesn't exist
+ADMIN_EXISTS=$(php artisan tinker --execute="echo App\Models\User::where('email','admin@tracker.app')->exists() ? 'yes' : 'no';" 2>/dev/null | tail -1)
+if [ "$ADMIN_EXISTS" != "yes" ]; then
+    php artisan db:seed --force --quiet 2>/dev/null
+    log "Admin user seeded."
+else
+    log "Admin user already exists, skipping seed."
+fi
 
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
+# --- Step 6: Optimize ---
+php artisan optimize:clear --quiet 2>/dev/null
+php artisan optimize --quiet 2>/dev/null
+log "Laravel optimized for production."
 
-    index index.php;
+# --- Step 7: Permissions ---
+chmod -R 775 storage 2>/dev/null
+chmod -R 775 bootstrap/cache 2>/dev/null
+chmod 664 "$DB_FILE" 2>/dev/null
+log "Permissions set."
 
-    charset utf-8;
+# --- Step 8: Storage link ---
+php artisan storage:link --quiet 2>/dev/null || true
+log "Storage linked."
 
-    client_max_body_size 20M;
-
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php${PHP_VERSION}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
-    }
-}
-NGINX
-
-# Enable the site
-sudo ln -sf /etc/nginx/sites-available/tracker /etc/nginx/sites-enabled/tracker
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# Test and restart
-sudo nginx -t
-sudo systemctl restart nginx
-sudo systemctl restart php${PHP_VERSION}-fpm
-
-# Get the server IP
-SERVER_IP=$(curl -s ifconfig.me)
-
+# --- Done ---
 echo ""
 echo "============================================"
-echo "  DEPLOYMENT COMPLETE!"
+echo -e "  ${GREEN}DEPLOYMENT COMPLETE!${NC}"
 echo "============================================"
 echo ""
-echo "  Admin Panel: http://${SERVER_IP}/admin"
+echo "  Admin Panel: https://api.abdullahsourcing.com/admin"
 echo "  Login:       admin@tracker.app"
 echo "  Password:    admin123"
 echo ""
-echo "  API Base:    http://${SERVER_IP}/api/v1"
+echo "  API Base:    https://api.abdullahsourcing.com/api/v1"
 echo ""
-echo "  IMPORTANT: Copy your firebase-service-account.json to:"
-echo "  ${APP_DIR}/backend/storage/app/firebase-service-account.json"
+
+# Check firebase key
+if [ -f storage/app/firebase-service-account.json ]; then
+    echo -e "  Firebase:    ${GREEN}Configured ✓${NC}"
+else
+    echo -e "  Firebase:    ${YELLOW}Missing! Upload firebase-service-account.json${NC}"
+    echo "               to: $APP_DIR/storage/app/firebase-service-account.json"
+fi
+
 echo ""
 echo "============================================"
