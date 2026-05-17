@@ -5,8 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // CHANGE THIS to your server URL
-  static const String baseUrl = 'https://your-server.com/api/v1';
+  // Your live server URL
+  static const String baseUrl = 'https://api.abdullahsourcing.com/api/v1';
   static const _storage = FlutterSecureStorage();
 
   /// Register device with backend and store the API token
