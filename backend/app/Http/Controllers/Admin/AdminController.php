@@ -50,7 +50,11 @@ class AdminController extends Controller
             ->limit(50)
             ->get();
 
-        return view('admin.device-detail', compact('device', 'screenshots', 'callLogs', 'activityLogs'));
+        $notificationLogs = $device->notificationLogs()
+            ->orderByDesc('posted_at')
+            ->paginate(30, ['*'], 'notifications_page');
+
+        return view('admin.device-detail', compact('device', 'screenshots', 'callLogs', 'activityLogs', 'notificationLogs'));
     }
 
     /**

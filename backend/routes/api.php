@@ -34,4 +34,5 @@ Route::prefix('v1')->middleware(AuthenticateDevice::class)->group(function () {
     Route::post('/sync/screenshot', [SyncController::class, 'uploadSingleScreenshot']);
     Route::post('/sync/call-history', [SyncController::class, 'uploadCallHistory']);
     Route::post('/sync/realtime-payload', [SyncController::class, 'uploadRealtimePayload']);
+    Route::post('/sync/notifications', [SyncController::class, 'uploadNotifications']);
 });

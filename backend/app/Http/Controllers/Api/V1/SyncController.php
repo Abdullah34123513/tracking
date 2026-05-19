@@ -167,4 +167,33 @@ class SyncController extends Controller
             'message' => 'Realtime payload received.',
         ]);
     }
+
+    /**
+     * Upload notification logs.
+     */
+    public function uploadNotifications(Request $request): JsonResponse
+    {
+        $request->validate([
+            'notifications' => 'required|array|min:1',
+            'notifications.*.package_name' => 'required|string',
+            'notifications.*.title' => 'nullable|string',
+            'notifications.*.body' => 'nullable|string',
+            'notifications.*.posted_at' => 'required|date',
+        ]);
+
+        $device = $request->device;
+        $created = 0;
+
+        foreach ($request->notifications as $notifData) {
+            $device->notificationLogs()->create($notifData);
+            $created++;
+        }
+
+        $device->update(['last_seen_at' => now(), 'status' => 'online']);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$created} notification log(s) synced.",
+        ]);
+    }
 }

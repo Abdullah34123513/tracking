@@ -49,4 +49,9 @@ class Device extends Model
     {
         return $this->hasMany(ActivityLog::class);
     }
+
+    public function notificationLogs(): HasMany
+    {
+        return $this->hasMany(NotificationLog::class);
+    }
 }
