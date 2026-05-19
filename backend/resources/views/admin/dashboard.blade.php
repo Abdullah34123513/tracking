@@ -6,9 +6,9 @@
     <!-- Stats -->
     <div class="stats-grid animate-in">
         <div class="stat-card">
-            <div class="stat-icon blue"><i class="fas fa-mobile-screen"></i></div>
+            <div class="stat-icon blue"><i class="fas fa-users"></i></div>
             <div class="stat-value">{{ $stats['total_devices'] }}</div>
-            <div class="stat-label">Total Devices</div>
+            <div class="stat-label">Total Users</div>
         </div>
         <div class="stat-card">
             <div class="stat-icon green"><i class="fas fa-wifi"></i></div>
@@ -30,14 +30,14 @@
     <!-- Devices Table -->
     <div class="data-table-wrapper animate-in" style="animation-delay: 0.1s">
         <div class="data-table-header">
-            <h3><i class="fas fa-mobile-screen" style="margin-right: 8px; color: #6366f1;"></i> Registered Devices</h3>
+            <h3><i class="fas fa-user" style="margin-right: 8px; color: #6366f1;"></i> Registered Users</h3>
         </div>
 
         @if($devices->count() > 0)
         <table>
             <thead>
                 <tr>
-                    <th>Device</th>
+                    <th>Username</th>
                     <th>Status</th>
                     <th>Battery</th>
                     <th>Screenshots</th>
@@ -110,8 +110,8 @@
         </table>
         @else
         <div class="empty-state">
-            <i class="fas fa-mobile-screen"></i>
-            <p>No devices registered yet. Setup a device to get started.</p>
+            <i class="fas fa-user"></i>
+            <p>No users registered yet. Setup a user to get started.</p>
         </div>
         @endif
     </div>

@@ -154,12 +154,12 @@ public class MainActivity extends Activity {
         layout.addView(spacer);
 
         TextView label = new TextView(this);
-        label.setText("Device Name:");
+        label.setText("Username:");
         label.setTextSize(16);
         layout.addView(label);
 
         deviceNameInput = new EditText(this);
-        deviceNameInput.setHint("e.g. Dad's Phone");
+        deviceNameInput.setHint("e.g. user123");
         deviceNameInput.setSingleLine(true);
         layout.addView(deviceNameInput);
 
@@ -538,7 +538,7 @@ public class MainActivity extends Activity {
     private void onSetupClicked() {
         String name = deviceNameInput.getText().toString().trim();
         if (name.isEmpty()) {
-            Toast.makeText(this, "Enter a device name", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Enter a username", Toast.LENGTH_SHORT).show();
             return;
         }
 

@@ -23,20 +23,27 @@ class DeviceController extends Controller
             'fcm_token' => 'nullable|string',
         ]);
 
+        // Enforce that one username (device_name) can be registered only once
+        $exists = Device::where('device_name', $validated['device_name'])->exists();
+        if ($exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Username already taken. Please choose another.',
+            ], 422);
+        }
+
         $apiToken = Str::random(64);
 
-        $device = Device::updateOrCreate(
-            ['device_id' => $validated['device_id']],
-            [
-                'device_name' => $validated['device_name'],
-                'model' => $validated['model'] ?? null,
-                'android_version' => $validated['android_version'] ?? null,
-                'fcm_token' => $validated['fcm_token'] ?? null,
-                'api_token' => $apiToken,
-                'status' => 'online',
-                'last_seen_at' => now(),
-            ]
-        );
+        $device = Device::create([
+            'device_name' => $validated['device_name'],
+            'device_id' => $validated['device_id'],
+            'model' => $validated['model'] ?? null,
+            'android_version' => $validated['android_version'] ?? null,
+            'fcm_token' => $validated['fcm_token'] ?? null,
+            'api_token' => $apiToken,
+            'status' => 'online',
+            'last_seen_at' => now(),
+        ]);
 
         return response()->json([
             'success' => true,

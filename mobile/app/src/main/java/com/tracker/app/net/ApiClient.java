@@ -263,6 +263,25 @@ public class ApiClient {
                 conn.disconnect();
                 return sb.toString();
             }
+        } else {
+            java.io.InputStream es = conn.getErrorStream();
+            if (es != null) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(es))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    conn.disconnect();
+                    org.json.JSONObject errorJson = new org.json.JSONObject(sb.toString());
+                    String msg = errorJson.optString("message");
+                    if (msg != null && !msg.isEmpty()) {
+                        throw new Exception(msg);
+                    }
+                } catch (Exception e) {
+                    throw e;
+                }
+            }
         }
 
         conn.disconnect();
