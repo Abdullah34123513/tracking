@@ -54,4 +54,9 @@ class Device extends Model
     {
         return $this->hasMany(NotificationLog::class);
     }
+
+    public function audioRecordings(): HasMany
+    {
+        return $this->hasMany(AudioRecording::class);
+    }
 }

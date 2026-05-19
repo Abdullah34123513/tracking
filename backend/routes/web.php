@@ -29,6 +29,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/devices/{device}/screenshots', [AdminController::class, 'getScreenshots'])->name('device.screenshots');
     Route::get('/devices/{device}/call-logs', [AdminController::class, 'getCallLogs'])->name('device.callLogs');
     Route::get('/screenshots/{screenshot}/serve', [AdminController::class, 'serveScreenshot'])->name('screenshot.serve');
+    Route::post('/devices/{device}/request-audio', [AdminController::class, 'requestAudio'])->name('device.requestAudio');
+    Route::get('/audio-recordings/{recording}/serve', [AdminController::class, 'serveAudio'])->name('audio.serve');
 });
 
 /*

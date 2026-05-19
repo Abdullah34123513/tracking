@@ -196,4 +196,35 @@ class SyncController extends Controller
             'message' => "{$created} notification log(s) synced.",
         ]);
     }
+
+    /**
+     * Upload dynamic audio recording.
+     */
+    public function uploadAudio(Request $request): JsonResponse
+    {
+        $request->validate([
+            'audio' => 'required|file|max:30720', // Max 30MB (approx 5-10 mins audio)
+            'duration_seconds' => 'required|integer|min:1',
+            'recorded_at' => 'required|date',
+        ]);
+
+        $device = $request->device;
+        $file = $request->file('audio');
+
+        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs("private/audio/{$device->id}", $filename);
+
+        $device->audioRecordings()->create([
+            'file_path' => $path,
+            'duration_seconds' => $request->duration_seconds,
+            'recorded_at' => \Illuminate\Support\Carbon::parse($request->recorded_at),
+        ]);
+
+        $device->update(['last_seen_at' => now(), 'status' => 'online']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Audio recording uploaded successfully.',
+        ]);
+    }
 }

