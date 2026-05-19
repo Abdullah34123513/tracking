@@ -200,6 +200,8 @@
             <p>No activity recorded yet.</p>
         </div>
         @endif
+    </div>
+
     <!-- Notifications Tab -->
     <div id="tab-notifications" class="tab-content" style="display:none;">
         @if($notificationLogs->count() > 0)
@@ -235,10 +237,10 @@
                             </span>
                         </td>
                         <td>
-                            <div style="font-weight:600;color:#f8fafc;">{{ $log->title ?? '—' }}</div>
+                            <div style="font-weight:600;color:#f8fafc;">{{ $log->title ?: '—' }}</div>
                         </td>
                         <td>
-                            <div style="color:#cbd5e1;max-width:600px;word-break:break-word;font-size:13px;">{{ $log->body ?? '—' }}</div>
+                            <div style="color:#cbd5e1;max-width:600px;word-break:break-word;font-size:13px;">{{ $log->body ?: '—' }}</div>
                         </td>
                         <td>
                             <span style="font-size:12px;color:#94a3b8;">
