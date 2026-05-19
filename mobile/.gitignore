@@ -1,0 +1,35 @@
+# Built artifacts
+*.apk
+*.aar
+*.ap_
+*.dex
+*.class
+**/build/
+build/
+
+# Gradle files
+.gradle/
+/local.properties
+/captures/
+.externalNativeBuild/
+.cxx/
+/gradle-app.setting
+
+# IntelliJ IDEA / Android Studio files
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Keystores and private signing files
+*.jks
+*.keystore
+!debug.keystore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log

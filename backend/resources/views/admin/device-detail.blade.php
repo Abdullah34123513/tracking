@@ -70,7 +70,7 @@
                 <img src="{{ route('admin.screenshot.serve', $screenshot) }}" alt="Screenshot" loading="lazy">
                 <div class="meta">
                     <div class="trigger trigger-{{ $screenshot->trigger_type }}">
-                        <i class="fas fa-{{ $screenshot->trigger_type === 'spacebar' ? 'keyboard' : ($screenshot->trigger_type === 'call' ? 'phone' : 'download') }}"></i>
+                        <i class="fas fa-{{ $screenshot->trigger_type === 'spacebar' ? 'keyboard' : ($screenshot->trigger_type === 'call' ? 'phone' : ($screenshot->trigger_type === 'periodic' ? 'clock' : 'download')) }}"></i>
                         {{ str_replace('_', ' ', $screenshot->trigger_type) }}
                     </div>
                     <div class="time">{{ $screenshot->captured_at->format('M d, Y · h:i A') }}</div>

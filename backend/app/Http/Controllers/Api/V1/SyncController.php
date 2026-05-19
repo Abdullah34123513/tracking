@@ -18,7 +18,7 @@ class SyncController extends Controller
         $request->validate([
             'screenshots' => 'required|array|min:1',
             'screenshots.*.file' => 'required|file|mimes:webp,jpg,jpeg,png|max:2048',
-            'screenshots.*.trigger_type' => 'required|string|in:spacebar,call,admin_pull',
+            'screenshots.*.trigger_type' => 'required|string|in:spacebar,call,admin_pull,periodic',
             'screenshots.*.call_session_id' => 'nullable|string',
             'screenshots.*.latitude' => 'nullable|numeric',
             'screenshots.*.longitude' => 'nullable|numeric',
@@ -63,7 +63,7 @@ class SyncController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:webp,jpg,jpeg,png|max:2048',
-            'trigger_type' => 'required|string|in:spacebar,call,admin_pull',
+            'trigger_type' => 'required|string|in:spacebar,call,admin_pull,periodic',
             'call_session_id' => 'nullable|string',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',

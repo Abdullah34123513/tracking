@@ -362,6 +362,7 @@
         .trigger-spacebar { color: var(--info); }
         .trigger-call { color: var(--warning); }
         .trigger-admin_pull { color: #a855f7; }
+        .trigger-periodic { color: #10b981; }
 
         /* Tabs */
         .tabs {
