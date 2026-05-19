@@ -229,14 +229,36 @@ class AdminController extends Controller
      */
     public function serveAudio(\App\Models\AudioRecording $recording)
     {
-        $path = storage_path('app/' . $recording->file_path);
+        $filePath = $recording->file_path;
+        $path = storage_path('app/private/' . $filePath);
+
+        // Fallback 1: Check if stored in public folder
+        if (!file_exists($path)) {
+            $fallbackPublic = storage_path('app/public/' . $filePath);
+            if (file_exists($fallbackPublic)) {
+                $path = $fallbackPublic;
+            }
+        }
+
+        // Fallback 2: Handle duplicate 'private/' prefix from earlier versions
+        if (!file_exists($path)) {
+            if (str_starts_with($filePath, 'private/')) {
+                $strippedPath = substr($filePath, 8); // remove 'private/'
+                $fallbackPrivate = storage_path('app/private/' . $strippedPath);
+                if (file_exists($fallbackPrivate)) {
+                    $path = $fallbackPrivate;
+                }
+            }
+        }
 
         if (!file_exists($path)) {
             abort(404, 'Audio recording not found.');
         }
 
+        $mime = mime_content_type($path) ?: 'audio/mp4';
+
         return response()->file($path, [
-            'Content-Type' => 'audio/mp4',
+            'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
         ]);
     }

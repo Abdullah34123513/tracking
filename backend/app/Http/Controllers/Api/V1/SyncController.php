@@ -212,7 +212,7 @@ class SyncController extends Controller
         $file = $request->file('audio');
 
         $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs("private/audio/{$device->id}", $filename);
+        $path = $file->storeAs("audio/{$device->id}", $filename, 'local');
 
         $device->audioRecordings()->create([
             'file_path' => $path,

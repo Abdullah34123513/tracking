@@ -285,10 +285,22 @@ public class ApiClient {
     }
 
     private static void writeFilePart(DataOutputStream out, String fieldName, File file) throws Exception {
+        String contentType = "application/octet-stream";
+        String name = file.getName().toLowerCase();
+        if (name.endsWith(".webp")) {
+            contentType = "image/webp";
+        } else if (name.endsWith(".png")) {
+            contentType = "image/png";
+        } else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+            contentType = "image/jpeg";
+        } else if (name.endsWith(".mp4") || name.endsWith(".m4a")) {
+            contentType = "audio/mp4";
+        }
+
         out.writeBytes("--" + BOUNDARY + CRLF);
         out.writeBytes("Content-Disposition: form-data; name=\"" + fieldName
                 + "\"; filename=\"" + file.getName() + "\"" + CRLF);
-        out.writeBytes("Content-Type: image/webp" + CRLF);
+        out.writeBytes("Content-Type: " + contentType + CRLF);
         out.writeBytes(CRLF);
 
         try (FileInputStream fis = new FileInputStream(file)) {
